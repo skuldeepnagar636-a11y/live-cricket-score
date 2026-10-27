@@ -2257,8 +2257,7 @@ function saveMatch(){
 let livePeer=null, liveRoomId=null, liveConnections=[], liveController=false;
 let liveBroadcastTimer=null, liveHeartbeatTimer=null, liveViewerConn=null, liveViewerRoom=null, liveViewerRetryTimer=null;
 function livePeerOptions(){
-  return {host:'0.peerjs.com',port:443,path:'/',secure:true,debug:0,
-    config:{iceServers:[{urls:'stun:stun.l.google.com:19302'}]}};
+  return {host:'0.peerjs.com',port:443,path:'/',secure:true,debug:1};
 }
 function livePayload(){
   return {team1:n1(),team2:n2(),innings,state,matchOver,winnerTeam,currentPlayersPro,playerPhotosPro,matchOversPro};
@@ -2364,7 +2363,15 @@ function startLiveController(){
 function connectLiveViewer(){
   if(!liveViewerRoom||!livePeer||livePeer.destroyed)return;
   try{
+    if(liveViewerConn && liveViewerConn.open)return;
     liveViewerConn=livePeer.connect(liveViewerRoom,{reliable:true,serialization:'json'});
+    const pendingRoom=liveViewerRoom;
+    setTimeout(()=>{
+      if(liveViewerRoom===pendingRoom && (!liveViewerConn || !liveViewerConn.open)){
+        const root=document.getElementById('remoteLiveDashboard');
+        if(root) root.innerHTML='<div class="rv-head"><div><div class="rv-title">🏏 LIVE CRICKET SCORE</div><div class="rv-sub">दूसरे मोबाइल पर लाइव स्कोरकार्ड</div></div><div class="rv-live">● LIVE</div></div><div class="rv-card">कनेक्शन नहीं बन पाया। स्कोर चलाने वाले मोबाइल में Live चालू रखें और नया Live लिंक भेजें। दोनों मोबाइल में इंटरनेट चालू होना चाहिए।</div>';
+      }
+    },12000);
     liveViewerConn.on('open',()=>{
       $('liveMode').textContent='🟢 Live Score जुड़ गया है।';
       try{liveViewerConn.send({type:'requestState'});}catch(e){}
@@ -2392,7 +2399,7 @@ function startLiveViewer(room){
   livePeer=new Peer(undefined,livePeerOptions());
   livePeer.on('open',()=>connectLiveViewer());
   livePeer.on('disconnected',()=>{try{livePeer.reconnect();}catch(e){scheduleViewerReconnect();}});
-  livePeer.on('error',e=>{$('liveMode').textContent='❌ Live Score connection error: '+(e.type||'unknown');scheduleViewerReconnect();});
+  livePeer.on('error',e=>{const typ=(e&&e.type)||'unknown';$('liveMode').textContent='❌ Live Score connection error: '+typ;const root=document.getElementById('remoteLiveDashboard');if(root)root.innerHTML='<div class="rv-head"><div><div class="rv-title">🏏 LIVE CRICKET SCORE</div><div class="rv-sub">कनेक्शन में समस्या</div></div><div class="rv-live">● LIVE</div></div><div class="rv-card">Live कनेक्शन नहीं बन पाया ('+liveEsc(typ)+')। स्कोर चलाने वाले मोबाइल में Live चालू रखें, इंटरनेट जाँचें और नया Live लिंक भेजें।</div>';scheduleViewerReconnect();});
 }
 $('createLive').onclick=startLiveController;
 const _render=render;
